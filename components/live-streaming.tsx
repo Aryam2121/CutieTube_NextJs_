@@ -81,14 +81,8 @@ export function LiveStreaming() {
           is_live: true,
           chat_enabled: true,
         })
-        .select(`
-          *,
-          profiles (
-            username,
-            avatar_url
-          )
-        `)
-        .single()
+        .select("*")
+        .single<LiveStream>()
 
       if (error) throw error
 
