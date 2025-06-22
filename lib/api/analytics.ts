@@ -1,6 +1,9 @@
 import { supabaseAdmin } from "@/lib/database"
 
 export class AnalyticsService {
+  /**
+   * Low-level method to track a specific event
+   */
   static async trackEvent(data: {
     video_id?: string
     user_id?: string
@@ -10,14 +13,84 @@ export class AnalyticsService {
     browser?: string
     country_code?: string
     referrer?: string
+    timestamp?: string
   }) {
-    const { error } = await supabaseAdmin.from("video_analytics").insert(data)
+    const { error } = await supabaseAdmin.from("video_analytics").insert({
+      ...data,
+      timestamp: data.timestamp || new Date().toISOString(),
+    })
 
     if (error) {
       console.error("Failed to track event:", error.message)
     }
   }
 
+  /**
+   * High-level wrapper to track an event using track("view", {...})
+   */
+  static async track(
+    event_type: "view" | "like" | "share" | "comment" | "watch_time" | "click",
+    properties: {
+      video_id?: string
+      user_id?: string
+      watch_duration?: number
+      device_type?: string
+      browser?: string
+      country_code?: string
+      referrer?: string
+      timestamp?: string
+    }
+  ) {
+    await this.trackEvent({
+      event_type,
+      ...properties,
+    })
+  }
+
+  /**
+   * Record a view event for a video
+   */
+  static async recordVideoView(videoId: string, meta?: {
+    user_id?: string
+    device_type?: string
+    browser?: string
+    country_code?: string
+    referrer?: string
+  }) {
+    const { error } = await supabaseAdmin.from("video_analytics").insert({
+      video_id: videoId,
+      event_type: "view",
+      timestamp: new Date().toISOString(),
+      ...meta,
+    })
+
+    if (error) {
+      console.error("Failed to record video view:", error.message)
+      throw new Error("Failed to record video view")
+    }
+  }
+
+  /**
+   * Get total number of view events for a video
+   */
+  static async getVideoViews(videoId: string): Promise<number> {
+    const { count, error } = await supabaseAdmin
+      .from("video_analytics")
+      .select("*", { count: "exact", head: true })
+      .eq("video_id", videoId)
+      .eq("event_type", "view")
+
+    if (error) {
+      console.error("Failed to fetch video views:", error.message)
+      throw new Error("Failed to fetch video views")
+    }
+
+    return count || 0
+  }
+
+  /**
+   * Get all analytics events for a video over a time period
+   */
   static async getVideoAnalytics(videoId: string, period: "day" | "week" | "month" = "week") {
     const startDate = new Date()
     switch (period) {
@@ -46,6 +119,9 @@ export class AnalyticsService {
     return data || []
   }
 
+  /**
+   * Get analytics across all videos of a channel/user over a time period
+   */
   static async getChannelAnalytics(userId: string, period: "day" | "week" | "month" = "week") {
     const startDate = new Date()
     switch (period) {
@@ -77,14 +153,18 @@ export class AnalyticsService {
     return data || []
   }
 
+  /**
+   * Calculate trending videos based on views, likes, and age
+   */
   static async updateTrendingVideos() {
-    // Calculate trending scores for all videos
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
     const { data: videos, error } = await supabaseAdmin
       .from("videos")
       .select("id, views, likes, created_at")
       .eq("status", "published")
       .eq("visibility", "public")
-      .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // Last 7 days
+      .gte("created_at", oneWeekAgo)
 
     if (error) {
       throw new Error(`Failed to fetch videos for trending calculation: ${error.message}`)
@@ -92,7 +172,6 @@ export class AnalyticsService {
 
     const trendingData = videos
       ?.map((video, index) => {
-        // Simple trending score calculation
         const hoursOld = (Date.now() - new Date(video.created_at).getTime()) / (1000 * 60 * 60)
         const score = (video.views * 0.6 + video.likes * 10) / Math.max(hoursOld, 1)
 
@@ -111,10 +190,8 @@ export class AnalyticsService {
       }))
 
     if (trendingData && trendingData.length > 0) {
-      // Clear existing trending data
       await supabaseAdmin.from("trending_videos").delete().eq("period", "daily")
 
-      // Insert new trending data
       const { error: insertError } = await supabaseAdmin.from("trending_videos").insert(trendingData)
 
       if (insertError) {

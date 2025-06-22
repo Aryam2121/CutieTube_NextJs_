@@ -1,69 +1,65 @@
-"use client"
+import Razorpay from "razorpay"
+import { createClient } from "@supabase/supabase-js"
+import { NextResponse } from "next/server"
 
-import { useState, useEffect } from "react"
+export async function POST(request: Request) {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL as string,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+    )
+    const { data: user, error: userError } = await supabase.auth.getUser()
 
-export function useApi<T>(url: string, options?: RequestInit) {
-  const [data, setData] = useState<T | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchData = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const response = await fetch(url, options)
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const result = await response.json()
-      setData(result)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
-    } finally {
-      setLoading(false)
+    if (userError) {
+      return NextResponse.json({ error: userError.message }, { status: 500 })
     }
-  }
 
-  useEffect(() => {
-    fetchData()
-  }, [url])
+    const { amount } = await request.json()
 
-  return { data, loading, error, refetch: () => fetchData() }
-}
+    if (!amount) {
+      return NextResponse.json({ error: "Amount is required" }, { status: 400 })
+    }
 
-export function useApiMutation<T, U = any>(url: string, method: "POST" | "PUT" | "DELETE" = "POST") {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    })
 
-  const mutate = async (data?: U): Promise<T | null> => {
-    try {
-      setLoading(true)
-      setError(null)
+    const options = {
+      amount: amount * 100, // amount in the smallest currency unit
+      currency: "INR",
+      receipt: "order_rcptid_" + Date.now(),
+    }
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
+    const order = await razorpay.orders.create(options)
+
+    if (!order) {
+      return NextResponse.json({ error: "Failed to create order" }, { status: 500 })
+    }
+
+    // Store order details in Supabase
+    const { data, error } = await supabase
+      .from("orders")
+      .insert([
+        {
+          user_id: user.user.id,
+          order_id: order.id,
+          amount: amount,
+          currency: order.currency,
+          receipt: order.receipt,
+          status: order.status,
         },
-        body: data ? JSON.stringify(data) : undefined,
-      })
+      ])
+      .select()
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const result = await response.json()
-      return result
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
-      return null
-    } finally {
-      setLoading(false)
+    if (error) {
+      console.error("Supabase error:", error)
+      return NextResponse.json({ error: "Failed to store order details" }, { status: 500 })
     }
-  }
 
-  return { mutate, loading, error }
+    return NextResponse.json({ order }, { status: 200 })
+  } catch (error: any) {
+    console.error("Error creating order:", error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 }

@@ -1,23 +1,37 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import { AnalyticsService } from "@/lib/api/analytics"
 
-export async function GET(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const period = (searchParams.get("period") as "day" | "week" | "month") || "week"
-
-    // Extract the video ID from the URL
-    const pathSegments = request.nextUrl.pathname.split("/")
-    const id = pathSegments[pathSegments.length - 1] // or use `.at(-1)`
+    // Extract video ID from the dynamic route
+    const id = req.nextUrl.pathname.split("/").pop()
 
     if (!id) {
-      return NextResponse.json({ error: "Video ID is required" }, { status: 400 })
+      return new NextResponse("Video ID is required", { status: 400 })
     }
 
-    const analytics = await AnalyticsService.getVideoAnalytics(id, period)
-    return NextResponse.json(analytics)
+    await AnalyticsService.recordVideoView(id)
+
+    return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Error fetching video analytics:", error)
-    return NextResponse.json({ error: "Failed to fetch video analytics" }, { status: 500 })
+    console.error("[VIDEO_ANALYTICS_POST]", error)
+    return new NextResponse("Internal Error", { status: 500 })
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const id = req.nextUrl.pathname.split("/").pop()
+
+    if (!id) {
+      return new NextResponse("Video ID is required", { status: 400 })
+    }
+
+    const views = await AnalyticsService.getVideoViews(id)
+
+    return NextResponse.json({ views })
+  } catch (error) {
+    console.error("[VIDEO_ANALYTICS_GET]", error)
+    return new NextResponse("Internal Error", { status: 500 })
   }
 }

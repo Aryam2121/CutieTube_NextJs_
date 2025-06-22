@@ -1,16 +1,12 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { VideoService } from "@/lib/api/videos"
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url)
-    const period = (searchParams.get("period") as "daily" | "weekly" | "monthly") || "daily"
-    const limit = Number.parseInt(searchParams.get("limit") || "20")
-
-    const videos = await VideoService.getTrendingVideos(period, limit)
+    const videos = await VideoService.getTrendingVideos()
     return NextResponse.json(videos)
   } catch (error) {
     console.error("Error fetching trending videos:", error)
-    return NextResponse.json({ error: "Failed to fetch trending videos" }, { status: 500 })
+    return new NextResponse("Internal Server Error", { status: 500 })
   }
 }

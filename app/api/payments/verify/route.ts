@@ -1,80 +1,61 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { verifyPaymentSignature } from "@/lib/razorpay"
-import { supabaseServer } from "@/lib/supabase-server"
+import { createHmac } from "crypto"
+import { createClient } from "@/lib/supabase-server"
+import { NextResponse } from "next/server"
 
-export async function POST(request: NextRequest) {
-  try {
-    const { orderId, paymentId, signature, subscriptionTierId, donationData } = await request.json()
+export async function POST(req: Request) {
+  const secret = process.env.LEMONSQUEEZY_WEBHOOK_SIGNING_SECRET
+  const rawBody = await req.text()
+  const hmac = createHmac("sha256", secret!)
+  const digest = hmac.update(rawBody).digest("hex")
+  const signature = req.headers.get("X-Signature")
 
-    // Verify payment signature
-    const isValid = verifyPaymentSignature(orderId, paymentId, signature)
+  if (digest === signature) {
+    console.log("Request is authentic")
+    try {
+      const data = JSON.parse(rawBody)
+      const event_name = data.event
+      if (event_name === "subscription_created") {
+        const supabase = createClient()
+        const customer_id = data.data.attributes.customer_id
+        const subscription_id = data.data.id
+        const user_email = data.data.attributes.user_email
 
-    if (!isValid) {
-      return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 })
-    }
+        const { data: profile } = await supabase.from("profiles").select("*").eq("email", user_email).single()
 
-    const supabase = supabaseServer
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Update payment order status
-    const { error: updateError } = await supabase
-      .from("payment_orders")
-      .update({
-        status: "completed",
-        payment_id: paymentId,
-        signature,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", orderId)
-
-    if (updateError) {
-      console.error("Failed to update payment order:", updateError)
-    }
-
-    // Handle subscription payment
-    if (subscriptionTierId) {
-      const { error: subError } = await supabase.from("subscriptions").upsert({
-        user_id: user.id,
-        tier_id: subscriptionTierId,
-        status: "active",
-        current_period_start: new Date().toISOString(),
-        current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
-        payment_id: paymentId,
-      })
-
-      if (subError) {
-        console.error("Failed to create subscription:", subError)
-        return NextResponse.json({ error: "Failed to create subscription" }, { status: 500 })
+        if (profile) {
+          await supabase
+            .from("profiles")
+            .update({
+              lemon_customer_id: customer_id,
+              lemon_subscription_id: subscription_id,
+              subscription_status: "active",
+            })
+            .eq("id", profile.id)
+        } else {
+          console.error("No profile found with that email")
+        }
       }
-    }
 
-    // Handle donation payment
-    if (donationData) {
-      const { error: donationError } = await supabase.from("donations").insert({
-        user_id: user.id,
-        amount: donationData.amount,
-        message: donationData.message,
-        donor_name: donationData.donorName,
-        payment_id: paymentId,
-        status: "completed",
-      })
+      if (event_name === "subscription_updated") {
+        const supabase = createClient()
+        const subscription_status = data.data.attributes.status
+        const subscription_id = data.data.id
 
-      if (donationError) {
-        console.error("Failed to record donation:", donationError)
-        return NextResponse.json({ error: "Failed to record donation" }, { status: 500 })
+        await supabase
+          .from("profiles")
+          .update({
+            subscription_status: subscription_status,
+          })
+          .eq("lemon_subscription_id", subscription_id)
       }
-    }
 
-    return NextResponse.json({ success: true, paymentId })
-  } catch (error) {
-    console.error("Payment verification error:", error)
-    return NextResponse.json({ error: "Failed to verify payment" }, { status: 500 })
+      return new NextResponse(null, { status: 200 })
+    } catch (error) {
+      console.error("Error processing webhook:", error)
+      return new NextResponse(null, { status: 500 })
+    }
+  } else {
+    console.log("Request is not authentic")
+    return new NextResponse(null, { status: 400 })
   }
 }

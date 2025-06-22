@@ -1,40 +1,32 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
+
+import { auth } from "@clerk/nextjs"
+import { prismadb } from "@/lib/db"
 import { UserService } from "@/lib/api/users"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
-    const subscriptions = await UserService.getSubscriptions(params.id)
-    return NextResponse.json(subscriptions)
-  } catch (error) {
-    console.error("Error fetching subscriptions:", error)
-    return NextResponse.json({ error: "Failed to fetch subscriptions" }, { status: 500 })
-  }
-}
+    const { userId } = auth()
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const { channelId } = await request.json()
-    const subscription = await UserService.subscribe(params.id, channelId)
-    return NextResponse.json(subscription, { status: 201 })
-  } catch (error) {
-    console.error("Error subscribing:", error)
-    return NextResponse.json({ error: "Failed to subscribe" }, { status: 500 })
-  }
-}
-
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const channelId = searchParams.get("channelId")
-
-    if (!channelId) {
-      return NextResponse.json({ error: "Channel ID is required" }, { status: 400 })
+    if (!userId) {
+      return new NextResponse("Unauthorized", { status: 403 })
     }
 
-    await UserService.unsubscribe(params.id, channelId)
-    return NextResponse.json({ success: true })
+    const user = await UserService.getUserById(params.id)
+
+    if (!user) {
+      return new NextResponse("User not found", { status: 404 })
+    }
+
+    const subscription = await prismadb.subscription.create({
+      data: {
+        userId: params.id,
+      },
+    })
+
+    return NextResponse.json(subscription)
   } catch (error) {
-    console.error("Error unsubscribing:", error)
-    return NextResponse.json({ error: "Failed to unsubscribe" }, { status: 500 })
+    console.log("[SUBSCRIPTION_POST]", error)
+    return new NextResponse("Internal Error", { status: 500 })
   }
 }

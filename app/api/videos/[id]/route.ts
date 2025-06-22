@@ -1,44 +1,58 @@
-import { type NextRequest, NextResponse } from "next/server"
 import { VideoService } from "@/lib/api/videos"
-import { AnalyticsService } from "@/lib/api/analytics"
+import { NextResponse } from "next/server"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
-    const video = await VideoService.getVideoById(params.id)
+    const videoId = params.id
 
-    // Track view event
-    await AnalyticsService.trackEvent({
-      video_id: params.id,
-      event_type: "view",
-    })
+    if (!videoId) {
+      return new NextResponse("Video ID is required", { status: 400 })
+    }
 
-    // Increment view count
-    await VideoService.incrementViews(params.id)
+    const video = await VideoService.getVideoById(videoId)
+
+    if (!video) {
+      return new NextResponse("Video not found", { status: 404 })
+    }
 
     return NextResponse.json(video)
   } catch (error) {
-    console.error("Error fetching video:", error)
-    return NextResponse.json({ error: "Failed to fetch video" }, { status: 500 })
+    console.log("[VIDEO_GET]", error)
+    return new NextResponse("Internal error", { status: 500 })
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   try {
-    const body = await request.json()
-    const video = await VideoService.updateVideo(params.id, body)
+    const videoId = params.id
+    const values = await req.json()
+
+    if (!videoId) {
+      return new NextResponse("Video ID is required", { status: 400 })
+    }
+
+    const video = await VideoService.updateVideo(videoId, values)
+
     return NextResponse.json(video)
   } catch (error) {
-    console.error("Error updating video:", error)
-    return NextResponse.json({ error: "Failed to update video" }, { status: 500 })
+    console.log("[VIDEO_PATCH]", error)
+    return new NextResponse("Internal error", { status: 500 })
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   try {
-    await VideoService.deleteVideo(params.id)
-    return NextResponse.json({ success: true })
+    const videoId = params.id
+
+    if (!videoId) {
+      return new NextResponse("Video ID is required", { status: 400 })
+    }
+
+    await VideoService.deleteVideo(videoId)
+
+    return new NextResponse("Video deleted", { status: 200 })
   } catch (error) {
-    console.error("Error deleting video:", error)
-    return NextResponse.json({ error: "Failed to delete video" }, { status: 500 })
+    console.log("[VIDEO_DELETE]", error)
+    return new NextResponse("Internal error", { status: 500 })
   }
 }

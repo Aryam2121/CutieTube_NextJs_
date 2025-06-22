@@ -1,56 +1,65 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { razorpay } from "@/lib/razorpay"
-import { supabaseServer } from "@/lib/supabase-server"
+import Razorpay from "razorpay"
+import { createClient } from "@supabase/supabase-js"
+import { NextResponse } from "next/server"
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const { amount, currency = "INR", receipt, notes } = await request.json()
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string
+    const supabase = createClient(supabaseUrl, supabaseKey)
+    const { data: user, error: userError } = await supabase.auth.getUser()
 
-    // Get user from session
-    const supabase = supabaseServer
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (userError) {
+      return NextResponse.json({ error: userError.message }, { status: 500 })
     }
 
-    // Create Razorpay order
-    const order = await razorpay.orders.create({
-      amount: amount * 100, // Convert to paise
-      currency,
-      receipt: receipt || `order_${Date.now()}`,
-      notes: {
-        userId: user.id,
-        ...notes,
-      },
-    })
+    const { amount } = await request.json()
 
-    // Store order in database
-    const { error: dbError } = await supabase.from("payment_orders").insert({
-      id: order.id,
-      user_id: user.id,
-      amount: amount,
-      currency,
-      status: "created",
-      receipt: order.receipt,
-      notes,
-    })
-
-    if (dbError) {
-      console.error("Database error:", dbError)
-      return NextResponse.json({ error: "Failed to store order" }, { status: 500 })
+    if (!amount) {
+      return NextResponse.json({ error: "Amount is required" }, { status: 400 })
     }
 
-    return NextResponse.json({
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
     })
-  } catch (error) {
-    console.error("Payment order creation error:", error)
-    return NextResponse.json({ error: "Failed to create payment order" }, { status: 500 })
+
+    const options = {
+      amount: amount * 100,  // amount in the smallest currency unit
+      currency: "INR",
+      receipt: "order_rcptid_" + Date.now(),
+    };
+
+    const order = await razorpay.orders.create(options);
+
+    if (!order) {
+      return NextResponse.json({ error: "Failed to create order" }, { status: 500 })
+    }
+
+    // Store order details in Supabase
+    const { data, error } = await supabase
+      .from('orders')
+      .insert([
+        {
+          user_id: user.user.id,
+          order_id: order.id,
+          amount: amount,
+          currency: order.currency,
+          receipt: order.receipt,
+          status: order.status,
+        },
+      ])
+      .select()
+
+    if (error) {
+      console.error("Supabase error:", error)
+      return NextResponse.json({ error: "Failed to store order details" }, { status: 500 })
+    }
+
+    return NextResponse.json({ order }, { status: 200 })
+
+  } catch (error: any) {
+    console.error("Error creating order:", error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

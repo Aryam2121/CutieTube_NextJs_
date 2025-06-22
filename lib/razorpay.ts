@@ -2,43 +2,31 @@ import Razorpay from "razorpay"
 
 // Server-side Razorpay instance
 export const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
+  key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
   key_secret: process.env.RAZORPAY_KEY_SECRET!,
 })
 
-// Client-side Razorpay options
-export const getRazorpayOptions = (
-  orderId: string,
-  amount: number,
-  currency = "INR",
-  name: string,
-  description: string,
-  userEmail: string,
-  userName: string,
-  onSuccess: (response: any) => void,
-  onFailure: (error: any) => void,
-) => ({
+// Client-side Razorpay configuration
+export const razorpayConfig = {
   key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
-  amount: amount * 100, // Razorpay expects amount in paise
-  currency,
+  currency: "INR",
   name: "CutieTube",
-  description,
-  order_id: orderId,
-  handler: onSuccess,
-  prefill: {
-    name: userName,
-    email: userEmail,
-  },
+  description: "Video Platform Subscription",
+  image: "/logo.png",
   theme: {
     color: "#3B82F6",
   },
-  modal: {
-    ondismiss: onFailure,
-  },
-})
+}
 
-// Payment verification
-export const verifyPaymentSignature = (orderId: string, paymentId: string, signature: string): boolean => {
+// Utility functions
+export const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+  }).format(amount / 100) // Razorpay amounts are in paise
+}
+
+export const validatePaymentSignature = (orderId: string, paymentId: string, signature: string): boolean => {
   const crypto = require("crypto")
   const body = orderId + "|" + paymentId
   const expectedSignature = crypto
