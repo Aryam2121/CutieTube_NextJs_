@@ -6,7 +6,7 @@ export const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET!,
 })
 
-// Client-side Razorpay configuration
+// Client-side Razorpay default configuration
 export const razorpayConfig = {
   key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
   currency: "INR",
@@ -18,7 +18,7 @@ export const razorpayConfig = {
   },
 }
 
-// Utility functions
+// Utility function to format currency to INR
 export const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -26,7 +26,12 @@ export const formatCurrency = (amount: number) => {
   }).format(amount / 100) // Razorpay amounts are in paise
 }
 
-export const validatePaymentSignature = (orderId: string, paymentId: string, signature: string): boolean => {
+// Validate Razorpay payment signature (server-side)
+export const validatePaymentSignature = (
+  orderId: string,
+  paymentId: string,
+  signature: string
+): boolean => {
   const crypto = require("crypto")
   const body = orderId + "|" + paymentId
   const expectedSignature = crypto
@@ -35,4 +40,20 @@ export const validatePaymentSignature = (orderId: string, paymentId: string, sig
     .digest("hex")
 
   return expectedSignature === signature
+}
+
+// ✅ Dynamic Razorpay payment options for the frontend
+export const getRazorpayOptions = (orderId: string, amount: number) => {
+  return {
+    key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
+    amount: amount * 100, // in paise
+    currency: "INR",
+    name: "CutieTube",
+    description: "Video Platform Subscription",
+    image: "/logo.png",
+    order_id: orderId,
+    theme: {
+      color: "#3B82F6",
+    },
+  }
 }

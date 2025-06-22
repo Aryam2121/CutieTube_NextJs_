@@ -18,10 +18,10 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Crown, Gift, TrendingUp, Users, Star, Heart, CreditCard, IndianRupee } from "lucide-react"
+import { DollarSign, Crown, Gift, TrendingUp, Users, Star, Heart, CreditCard } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
+import { getSupabaseClient } from "@/lib/supabase"
 import { toast } from "sonner"
-import { getRazorpayOptions } from "@/lib/razorpay"
 
 interface Subscription {
   id: string
@@ -44,7 +44,7 @@ const subscriptionTiers: Subscription[] = [
   {
     id: "1",
     tier_name: "Supporter",
-    price: 199,
+    price: 2.99,
     benefits: ["Early access to videos", "Custom badge", "Priority comments"],
     subscriber_count: 45,
     color: "blue",
@@ -52,7 +52,7 @@ const subscriptionTiers: Subscription[] = [
   {
     id: "2",
     tier_name: "Super Fan",
-    price: 499,
+    price: 9.99,
     benefits: ["All Supporter benefits", "Monthly live Q&A", "Discord access", "Behind-the-scenes content"],
     subscriber_count: 23,
     color: "purple",
@@ -60,10 +60,34 @@ const subscriptionTiers: Subscription[] = [
   {
     id: "3",
     tier_name: "VIP",
-    price: 999,
+    price: 24.99,
     benefits: ["All previous benefits", "1-on-1 monthly call", "Exclusive merch", "Input on content ideas"],
     subscriber_count: 8,
     color: "gold",
+  },
+]
+
+const recentDonations: Donation[] = [
+  {
+    id: "1",
+    amount: 25.0,
+    message: "Love your content! Keep it up!",
+    donor_name: "TechFan123",
+    created_at: "2024-01-15T10:30:00Z",
+  },
+  {
+    id: "2",
+    amount: 10.0,
+    message: "Thanks for the tutorial on React hooks!",
+    donor_name: "ReactDev",
+    created_at: "2024-01-15T09:15:00Z",
+  },
+  {
+    id: "3",
+    amount: 50.0,
+    message: "Amazing work as always!",
+    donor_name: "CodeMaster",
+    created_at: "2024-01-14T16:45:00Z",
   },
 ]
 
@@ -77,245 +101,18 @@ export function Monetization() {
   const [merchandiseEnabled, setMerchandiseEnabled] = useState(false)
   const [showCreateTierDialog, setShowCreateTierDialog] = useState(false)
   const [showDonationDialog, setShowDonationDialog] = useState(false)
-  const [donations, setDonations] = useState<Donation[]>([])
-  const [userSubscriptions, setUserSubscriptions] = useState<any[]>([])
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+  const supabase = getSupabaseClient()
 
   useEffect(() => {
-    fetchDonations()
-    fetchUserSubscriptions()
-
     // Calculate totals
     const subsRevenue = subscriptionTiers.reduce((sum, tier) => sum + tier.price * tier.subscriber_count, 0)
-    const donationsRevenue = donations.reduce((sum, donation) => sum + donation.amount, 0)
+    const donationsRevenue = recentDonations.reduce((sum, donation) => sum + donation.amount, 0)
     const totalSubs = subscriptionTiers.reduce((sum, tier) => sum + tier.subscriber_count, 0)
 
     setTotalRevenue(subsRevenue + donationsRevenue)
     setMonthlyRevenue(subsRevenue)
     setTotalSubscribers(totalSubs)
-  }, [donations])
-
-  const fetchDonations = async () => {
-    try {
-      const response = await fetch("/api/donations")
-      if (response.ok) {
-        const data = await response.json()
-        setDonations(data.donations || [])
-      }
-    } catch (error) {
-      console.error("Failed to fetch donations:", error)
-    }
-  }
-
-  const fetchUserSubscriptions = async () => {
-    try {
-      const response = await fetch("/api/subscriptions")
-      if (response.ok) {
-        const data = await response.json()
-        setUserSubscriptions(data.subscriptions || [])
-      }
-    } catch (error) {
-      console.error("Failed to fetch subscriptions:", error)
-    }
-  }
-
-  const handleSubscription = async (tierId: string) => {
-    if (!user) {
-      toast.error("Please login to subscribe")
-      return
-    }
-
-    setIsProcessingPayment(true)
-
-    try {
-      // Get subscription tier details
-      const tierResponse = await fetch("/api/subscriptions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tierId }),
-      })
-
-      if (!tierResponse.ok) {
-        throw new Error("Failed to get subscription details")
-      }
-
-      const { tier } = await tierResponse.json()
-
-      // Create payment order
-      const orderResponse = await fetch("/api/payments/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: tier.price,
-          currency: "INR",
-          receipt: `subscription_${tierId}_${Date.now()}`,
-          notes: {
-            type: "subscription",
-            tierId: tierId,
-            tierName: tier.name,
-          },
-        }),
-      })
-
-      if (!orderResponse.ok) {
-        throw new Error("Failed to create payment order")
-      }
-
-      const { orderId } = await orderResponse.json()
-
-      // Initialize Razorpay
-      const options = getRazorpayOptions(
-        orderId,
-        tier.price,
-        "INR",
-        user.user_metadata?.full_name || user.email || "User",
-        `Subscription to ${tier.name}`,
-        user.email || "",
-        user.user_metadata?.full_name || "User",
-        async (response: any) => {
-          // Payment success
-          try {
-            const verifyResponse = await fetch("/api/payments/verify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                orderId: response.razorpay_order_id,
-                paymentId: response.razorpay_payment_id,
-                signature: response.razorpay_signature,
-                subscriptionTierId: tierId,
-              }),
-            })
-
-            if (verifyResponse.ok) {
-              toast.success("Subscription activated successfully!")
-              fetchUserSubscriptions()
-            } else {
-              toast.error("Payment verification failed")
-            }
-          } catch (error) {
-            console.error("Payment verification error:", error)
-            toast.error("Payment verification failed")
-          } finally {
-            setIsProcessingPayment(false)
-          }
-        },
-        (error: any) => {
-          // Payment failure
-          console.error("Payment failed:", error)
-          toast.error("Payment failed or cancelled")
-          setIsProcessingPayment(false)
-        },
-      )
-
-      // Load Razorpay script and open payment modal
-      const script = document.createElement("script")
-      script.src = "https://checkout.razorpay.com/v1/checkout.js"
-      script.onload = () => {
-        const rzp = new (window as any).Razorpay(options)
-        rzp.open()
-      }
-      document.body.appendChild(script)
-    } catch (error) {
-      console.error("Subscription error:", error)
-      toast.error("Failed to process subscription")
-      setIsProcessingPayment(false)
-    }
-  }
-
-  const handleDonation = async (amount: number, message: string, donorName: string) => {
-    if (!user) {
-      toast.error("Please login to donate")
-      return
-    }
-
-    setIsProcessingPayment(true)
-
-    try {
-      // Create payment order
-      const orderResponse = await fetch("/api/payments/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount,
-          currency: "INR",
-          receipt: `donation_${Date.now()}`,
-          notes: {
-            type: "donation",
-            message,
-            donorName,
-          },
-        }),
-      })
-
-      if (!orderResponse.ok) {
-        throw new Error("Failed to create payment order")
-      }
-
-      const { orderId } = await orderResponse.json()
-
-      // Initialize Razorpay
-      const options = getRazorpayOptions(
-        orderId,
-        amount,
-        "INR",
-        donorName || user.user_metadata?.full_name || user.email || "Anonymous",
-        `Donation: ${message}`,
-        user.email || "",
-        donorName || user.user_metadata?.full_name || "Anonymous",
-        async (response: any) => {
-          // Payment success
-          try {
-            const verifyResponse = await fetch("/api/payments/verify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                orderId: response.razorpay_order_id,
-                paymentId: response.razorpay_payment_id,
-                signature: response.razorpay_signature,
-                donationData: {
-                  amount,
-                  message,
-                  donorName: donorName || "Anonymous",
-                },
-              }),
-            })
-
-            if (verifyResponse.ok) {
-              toast.success("Thank you for your donation!")
-              fetchDonations()
-              setShowDonationDialog(false)
-            } else {
-              toast.error("Payment verification failed")
-            }
-          } catch (error) {
-            console.error("Payment verification error:", error)
-            toast.error("Payment verification failed")
-          } finally {
-            setIsProcessingPayment(false)
-          }
-        },
-        (error: any) => {
-          // Payment failure
-          console.error("Payment failed:", error)
-          toast.error("Payment failed or cancelled")
-          setIsProcessingPayment(false)
-        },
-      )
-
-      // Load Razorpay script and open payment modal
-      const script = document.createElement("script")
-      script.src = "https://checkout.razorpay.com/v1/checkout.js"
-      script.onload = () => {
-        const rzp = new (window as any).Razorpay(options)
-        rzp.open()
-      }
-      document.body.appendChild(script)
-    } catch (error) {
-      console.error("Donation error:", error)
-      toast.error("Failed to process donation")
-      setIsProcessingPayment(false)
-    }
-  }
+  }, [])
 
   const createSubscriptionTier = async (formData: FormData) => {
     const tierName = formData.get("tierName") as string
@@ -328,9 +125,9 @@ export function Monetization() {
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
+    return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "INR",
+      currency: "USD",
     }).format(amount)
   }
 
@@ -352,7 +149,7 @@ export function Monetization() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <IndianRupee className="h-4 w-4 text-muted-foreground" />
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
@@ -430,8 +227,8 @@ export function Monetization() {
                     <Input id="tierName" name="tierName" placeholder="e.g. Super Fan" required />
                   </div>
                   <div>
-                    <Label htmlFor="price">Monthly Price (₹)</Label>
-                    <Input id="price" name="price" type="number" step="1" placeholder="499" required />
+                    <Label htmlFor="price">Monthly Price ($)</Label>
+                    <Input id="price" name="price" type="number" step="0.01" placeholder="9.99" required />
                   </div>
                   <div>
                     <Label htmlFor="benefits">Benefits (one per line)</Label>
@@ -475,12 +272,9 @@ export function Monetization() {
                       </li>
                     ))}
                   </ul>
-                  <div className="text-sm text-muted-foreground mb-4">
+                  <div className="text-sm text-muted-foreground">
                     Monthly Revenue: {formatCurrency(tier.price * tier.subscriber_count)}
                   </div>
-                  <Button onClick={() => handleSubscription(tier.id)} disabled={isProcessingPayment} className="w-full">
-                    {isProcessingPayment ? "Processing..." : "Subscribe"}
-                  </Button>
                 </CardContent>
               </Card>
             ))}
@@ -492,40 +286,28 @@ export function Monetization() {
             <h3 className="text-lg font-semibold">Recent Donations</h3>
             <Dialog open={showDonationDialog} onOpenChange={setShowDonationDialog}>
               <DialogTrigger asChild>
-                <Button>Make Donation</Button>
+                <Button variant="outline">Donation Settings</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Make a Donation</DialogTitle>
-                  <DialogDescription>Support this creator with a donation</DialogDescription>
+                  <DialogTitle>Donation Settings</DialogTitle>
+                  <DialogDescription>Configure your donation options</DialogDescription>
                 </DialogHeader>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    const formData = new FormData(e.currentTarget)
-                    const amount = Number.parseFloat(formData.get("amount") as string)
-                    const message = formData.get("message") as string
-                    const donorName = formData.get("donorName") as string
-                    handleDonation(amount, message, donorName)
-                  }}
-                  className="space-y-4"
-                >
+                <div className="space-y-4">
                   <div>
-                    <Label htmlFor="amount">Amount (₹)</Label>
-                    <Input id="amount" name="amount" type="number" step="1" min="1" placeholder="100" required />
+                    <Label htmlFor="minDonation">Minimum Donation Amount ($)</Label>
+                    <Input id="minDonation" type="number" step="0.01" defaultValue="1.00" />
                   </div>
                   <div>
-                    <Label htmlFor="donorName">Your Name (optional)</Label>
-                    <Input id="donorName" name="donorName" placeholder="Anonymous" />
+                    <Label htmlFor="maxDonation">Maximum Donation Amount ($)</Label>
+                    <Input id="maxDonation" type="number" step="0.01" defaultValue="500.00" />
                   </div>
-                  <div>
-                    <Label htmlFor="message">Message (optional)</Label>
-                    <Textarea id="message" name="message" placeholder="Leave a message for the creator..." rows={3} />
+                  <div className="flex items-center space-x-2">
+                    <Switch id="allowAnonymous" defaultChecked />
+                    <Label htmlFor="allowAnonymous">Allow anonymous donations</Label>
                   </div>
-                  <Button type="submit" className="w-full" disabled={isProcessingPayment}>
-                    {isProcessingPayment ? "Processing..." : "Donate"}
-                  </Button>
-                </form>
+                  <Button>Save Settings</Button>
+                </div>
               </DialogContent>
             </Dialog>
           </div>
@@ -541,25 +323,19 @@ export function Monetization() {
               <CardContent className="space-y-4">
                 <div className="flex justify-between">
                   <span>Total Donations</span>
-                  <span className="font-bold">{formatCurrency(donations.reduce((sum, d) => sum + d.amount, 0))}</span>
+                  <span className="font-bold">{formatCurrency(85.0)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Average Donation</span>
-                  <span className="font-bold">
-                    {formatCurrency(
-                      donations.length > 0 ? donations.reduce((sum, d) => sum + d.amount, 0) / donations.length : 0,
-                    )}
-                  </span>
+                  <span className="font-bold">{formatCurrency(28.33)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Number of Donors</span>
-                  <span className="font-bold">{donations.length}</span>
+                  <span className="font-bold">3</span>
                 </div>
                 <div className="flex justify-between">
                   <span>This Month</span>
-                  <span className="font-bold text-green-600">
-                    {formatCurrency(donations.reduce((sum, d) => sum + d.amount, 0))}
-                  </span>
+                  <span className="font-bold text-green-600">{formatCurrency(85.0)}</span>
                 </div>
               </CardContent>
             </Card>
@@ -570,27 +346,23 @@ export function Monetization() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {donations.length > 0 ? (
-                    donations.slice(0, 5).map((donation) => (
-                      <div key={donation.id} className="flex items-start gap-3 p-3 border rounded-lg">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 flex items-center justify-center">
-                          <Heart className="h-4 w-4 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex justify-between items-start">
-                            <span className="font-medium">{donation.donor_name}</span>
-                            <span className="font-bold text-green-600">{formatCurrency(donation.amount)}</span>
-                          </div>
-                          <p className="text-sm text-muted-foreground">{donation.message}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {new Date(donation.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
+                  {recentDonations.map((donation) => (
+                    <div key={donation.id} className="flex items-start gap-3 p-3 border rounded-lg">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 flex items-center justify-center">
+                        <Heart className="h-4 w-4 text-white" />
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-center text-muted-foreground py-4">No donations yet</p>
-                  )}
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <span className="font-medium">{donation.donor_name}</span>
+                          <span className="font-bold text-green-600">{formatCurrency(donation.amount)}</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{donation.message}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(donation.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -617,11 +389,11 @@ export function Monetization() {
                   <h4 className="font-medium">Ad Performance</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <div className="text-2xl font-bold">{formatCurrency(24311)}</div>
+                      <div className="text-2xl font-bold">{formatCurrency(486.23)}</div>
                       <div className="text-sm text-muted-foreground">This Month</div>
                     </div>
                     <div>
-                      <div className="text-2xl font-bold">₹1.20</div>
+                      <div className="text-2xl font-bold">$0.024</div>
                       <div className="text-sm text-muted-foreground">RPM (Revenue per Mille)</div>
                     </div>
                   </div>
@@ -686,21 +458,21 @@ export function Monetization() {
 
               <div className="space-y-2">
                 <Label>Payout Method</Label>
-                <Select defaultValue="razorpay">
+                <Select defaultValue="paypal">
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="razorpay">Razorpay</SelectItem>
-                    <SelectItem value="upi">UPI</SelectItem>
+                    <SelectItem value="paypal">PayPal</SelectItem>
+                    <SelectItem value="stripe">Stripe</SelectItem>
                     <SelectItem value="bank">Bank Transfer</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="pan">PAN Number</Label>
-                <Input id="pan" placeholder="For tax reporting purposes" />
+                <Label htmlFor="tax-id">Tax ID/SSN</Label>
+                <Input id="tax-id" placeholder="For tax reporting purposes" />
               </div>
 
               <Button>
