@@ -1,5 +1,5 @@
 import { createHmac } from "crypto"
-import { createClient } from "@/lib/supabase-server"
+import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 
 export async function POST(req: Request) {
@@ -15,7 +15,9 @@ export async function POST(req: Request) {
       const data = JSON.parse(rawBody)
       const event_name = data.event
       if (event_name === "subscription_created") {
-        const supabase = createClient()
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
+        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+        const supabase = createClient(supabaseUrl, supabaseKey)
         const customer_id = data.data.attributes.customer_id
         const subscription_id = data.data.id
         const user_email = data.data.attributes.user_email
@@ -37,7 +39,9 @@ export async function POST(req: Request) {
       }
 
       if (event_name === "subscription_updated") {
-        const supabase = createClient()
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
+        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+        const supabase = createClient(supabaseUrl, supabaseKey)
         const subscription_status = data.data.attributes.status
         const subscription_id = data.data.id
 
