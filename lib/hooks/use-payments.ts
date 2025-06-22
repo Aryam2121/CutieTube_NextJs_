@@ -46,49 +46,53 @@ export function usePayments() {
 
       return new Promise((resolve) => {
         const options = getRazorpayOptions(
-          orderId,
-          amount,
-          "INR",
-          user.user_metadata?.full_name || user.email || "User",
-          description,
-          user.email || "",
-          user.user_metadata?.full_name || "User",
-          async (response: any) => {
-            // Payment success
-            try {
-              const verifyResponse = await fetch("/api/payments/verify", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  orderId: response.razorpay_order_id,
-                  paymentId: response.razorpay_payment_id,
-                  signature: response.razorpay_signature,
-                  ...metadata,
-                }),
-              })
+          {
+            orderId,
+            amount,
+            currency: "INR",
+            name: user.user_metadata?.full_name || user.email || "User",
+            description,
+            email: user.email || "",
+            handler: async (response: any) => {
+              // Payment success
+              try {
+                const verifyResponse = await fetch("/api/payments/verify", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    orderId: response.razorpay_order_id,
+                    paymentId: response.razorpay_payment_id,
+                    signature: response.razorpay_signature,
+                    ...metadata,
+                  }),
+                })
 
-              if (verifyResponse.ok) {
-                toast.success("Payment successful!")
-                resolve(true)
-              } else {
+                if (verifyResponse.ok) {
+                  toast.success("Payment successful!")
+                  resolve(true)
+                } else {
+                  toast.error("Payment verification failed")
+                  resolve(false)
+                }
+              } catch (error) {
+                console.error("Payment verification error:", error)
                 toast.error("Payment verification failed")
                 resolve(false)
+              } finally {
+                setIsProcessing(false)
               }
-            } catch (error) {
-              console.error("Payment verification error:", error)
-              toast.error("Payment verification failed")
-              resolve(false)
-            } finally {
-              setIsProcessing(false)
+            },
+            modal: {
+              ondismiss: (error: any) => {
+                // Payment failure or cancelled
+                console.error("Payment failed:", error)
+                toast.error("Payment failed or cancelled")
+                setIsProcessing(false)
+                resolve(false)
+              }
             }
           },
-          (error: any) => {
-            // Payment failure
-            console.error("Payment failed:", error)
-            toast.error("Payment failed or cancelled")
-            setIsProcessing(false)
-            resolve(false)
-          },
+          amount
         )
 
         // Load Razorpay script and open payment modal

@@ -43,17 +43,46 @@ export const validatePaymentSignature = (
 }
 
 // ✅ Dynamic Razorpay payment options for the frontend
-export const getRazorpayOptions = (orderId: string, amount: number) => {
+export const getRazorpayOptions = (
+  {
+    orderId,
+    amount,
+    currency,
+    name,
+    description,
+    email,
+    handler,
+    modal,
+  }: {
+    orderId: string
+    amount: number
+    currency: string
+    name: string
+    description: string
+    email: string
+    handler: (response: any) => void
+    modal: any
+  },
+  amountInRupees: number
+) => {
   return {
     key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
-    amount: amount * 100, // in paise
-    currency: "INR",
-    name: "CutieTube",
-    description: "Video Platform Subscription",
+    amount: amount * 100,
+    currency,
+    name,
+    description,
     image: "/logo.png",
     order_id: orderId,
+    prefill: {
+      name,
+      email,
+    },
     theme: {
       color: "#3B82F6",
     },
+    modal,
+    handler,
   }
 }
+
+
