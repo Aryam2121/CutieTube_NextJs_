@@ -4,7 +4,7 @@ import { NextResponse } from "next/server"
 
 export async function POST(request: Request) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
+    const supabaseUrl = "https://aqknwwmazqssqiiygbjk.supabase.co"
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string
     const supabase = createClient(supabaseUrl, supabaseKey)
     const { data: user, error: userError } = await supabase.auth.getUser()

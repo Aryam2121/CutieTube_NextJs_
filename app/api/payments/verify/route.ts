@@ -15,7 +15,7 @@ export async function POST(req: Request) {
       const data = JSON.parse(rawBody)
       const event_name = data.event
       if (event_name === "subscription_created") {
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
+        const supabaseUrl = "https://aqknwwmazqssqiiygbjk.supabase.co"
         const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
         const supabase = createClient(supabaseUrl, supabaseKey)
         const customer_id = data.data.attributes.customer_id
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       }
 
       if (event_name === "subscription_updated") {
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
+        const supabaseUrl = "https://aqknwwmazqssqiiygbjk.supabase.co"
         const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
         const supabase = createClient(supabaseUrl, supabaseKey)
         const subscription_status = data.data.attributes.status
