@@ -7,7 +7,11 @@ type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"]
 
 export class UserService {
   static async getProfile(userId: string) {
-    const { data, error } = await supabaseAdmin.from("profiles").select("*").eq("id", userId).single()
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single()
 
     if (error) {
       throw new Error(`Failed to fetch profile: ${error.message}`)
@@ -17,7 +21,11 @@ export class UserService {
   }
 
   static async createProfile(profile: ProfileInsert) {
-    const { data, error } = await supabaseAdmin.from("profiles").insert(profile).select().single()
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .insert(profile)
+      .select()
+      .single()
 
     if (error) {
       throw new Error(`Failed to create profile: ${error.message}`)
@@ -27,7 +35,12 @@ export class UserService {
   }
 
   static async updateProfile(userId: string, updates: ProfileUpdate) {
-    const { data, error } = await supabaseAdmin.from("profiles").update(updates).eq("id", userId).select().single()
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .update(updates)
+      .eq("id", userId)
+      .select()
+      .single()
 
     if (error) {
       throw new Error(`Failed to update profile: ${error.message}`)
@@ -115,5 +128,36 @@ export class UserService {
     }
 
     return !!data
+  }
+
+  // ✅ New method to get user by ID (same as getProfile for now)
+  static async getUserById(userId: string): Promise<Profile> {
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single()
+
+    if (error) {
+      throw new Error(`Failed to get user: ${error.message}`)
+    }
+
+    return data
+  }
+
+  // ✅ New method to update user by ID
+  static async updateUser(userId: string, updates: ProfileUpdate): Promise<Profile> {
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .update(updates)
+      .eq("id", userId)
+      .select()
+      .single()
+
+    if (error) {
+      throw new Error(`Failed to update user: ${error.message}`)
+    }
+
+    return data
   }
 }

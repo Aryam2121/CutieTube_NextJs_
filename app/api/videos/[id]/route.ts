@@ -1,58 +1,41 @@
+import { type NextRequest, NextResponse } from "next/server"
 import { VideoService } from "@/lib/api/videos"
-import { NextResponse } from "next/server"
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const videoId = params.id
-
-    if (!videoId) {
-      return new NextResponse("Video ID is required", { status: 400 })
-    }
-
-    const video = await VideoService.getVideoById(videoId)
+    const params = await context.params
+    const video = await VideoService.getVideoById(params.id)
 
     if (!video) {
-      return new NextResponse("Video not found", { status: 404 })
+      return NextResponse.json({ error: "Video not found" }, { status: 404 })
     }
 
     return NextResponse.json(video)
   } catch (error) {
-    console.log("[VIDEO_GET]", error)
-    return new NextResponse("Internal error", { status: 500 })
+    console.error("Error fetching video:", error)
+    return NextResponse.json({ error: "Failed to fetch video" }, { status: 500 })
   }
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const videoId = params.id
-    const values = await req.json()
-
-    if (!videoId) {
-      return new NextResponse("Video ID is required", { status: 400 })
-    }
-
-    const video = await VideoService.updateVideo(videoId, values)
-
+    const params = await context.params
+    const body = await request.json()
+    const video = await VideoService.updateVideo(params.id, body)
     return NextResponse.json(video)
   } catch (error) {
-    console.log("[VIDEO_PATCH]", error)
-    return new NextResponse("Internal error", { status: 500 })
+    console.error("Error updating video:", error)
+    return NextResponse.json({ error: "Failed to update video" }, { status: 500 })
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const videoId = params.id
-
-    if (!videoId) {
-      return new NextResponse("Video ID is required", { status: 400 })
-    }
-
-    await VideoService.deleteVideo(videoId)
-
-    return new NextResponse("Video deleted", { status: 200 })
+    const params = await context.params
+    await VideoService.deleteVideo(params.id)
+    return NextResponse.json({ success: true })
   } catch (error) {
-    console.log("[VIDEO_DELETE]", error)
-    return new NextResponse("Internal error", { status: 500 })
+    console.error("Error deleting video:", error)
+    return NextResponse.json({ error: "Failed to delete video" }, { status: 500 })
   }
 }

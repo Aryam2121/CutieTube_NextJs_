@@ -1,37 +1,22 @@
-import { NextResponse, type NextRequest } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { AnalyticsService } from "@/lib/api/analytics"
 
-export async function POST(req: NextRequest) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    // Extract video ID from the dynamic route
-    const id = req.nextUrl.pathname.split("/").pop()
+    const params = await context.params
+    const { searchParams } = new URL(request.url)
+    const startDate = searchParams.get("startDate")
+    const endDate = searchParams.get("endDate")
 
-    if (!id) {
-      return new NextResponse("Video ID is required", { status: 400 })
-    }
+    // You can choose the period based on your logic, here using "week" as default
+    const analytics = await AnalyticsService.getVideoAnalytics(
+      params.id,
+      "week"
+    )
 
-    await AnalyticsService.recordVideoView(id)
-
-    return NextResponse.json({ success: true })
+    return NextResponse.json(analytics)
   } catch (error) {
-    console.error("[VIDEO_ANALYTICS_POST]", error)
-    return new NextResponse("Internal Error", { status: 500 })
-  }
-}
-
-export async function GET(req: NextRequest) {
-  try {
-    const id = req.nextUrl.pathname.split("/").pop()
-
-    if (!id) {
-      return new NextResponse("Video ID is required", { status: 400 })
-    }
-
-    const views = await AnalyticsService.getVideoViews(id)
-
-    return NextResponse.json({ views })
-  } catch (error) {
-    console.error("[VIDEO_ANALYTICS_GET]", error)
-    return new NextResponse("Internal Error", { status: 500 })
+    console.error("Error fetching video analytics:", error)
+    return NextResponse.json({ error: "Failed to fetch video analytics" }, { status: 500 })
   }
 }

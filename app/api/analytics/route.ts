@@ -1,20 +1,23 @@
+import { type NextRequest, NextResponse } from "next/server"
 import { AnalyticsService } from "@/lib/api/analytics"
-import { NextResponse } from "next/server"
 
-export async function POST(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { event, properties } = body
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get("userId")
+    const startDate = searchParams.get("startDate")
+    const endDate = searchParams.get("endDate")
 
-    if (!event) {
-      return new NextResponse("Event is required", { status: 400 })
+    if (!userId) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 })
     }
 
-    await AnalyticsService.track(event, properties)
+    // You can adjust the period as needed: "day", "week", or "month"
+    const analytics = await AnalyticsService.getChannelAnalytics(userId)
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json(analytics)
   } catch (error) {
-    console.error("[ANALYTICS_POST]", error)
-    return new NextResponse("Internal error", { status: 500 })
+    console.error("Error fetching analytics:", error)
+    return NextResponse.json({ error: "Failed to fetch analytics" }, { status: 500 })
   }
 }

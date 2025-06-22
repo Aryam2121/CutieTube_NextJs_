@@ -1,32 +1,48 @@
-import { NextResponse } from "next/server"
-
-import { auth } from "@clerk/nextjs"
-import { prismadb } from "@/lib/db"
+import { type NextRequest, NextResponse } from "next/server"
 import { UserService } from "@/lib/api/users"
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { userId } = auth()
-
-    if (!userId) {
-      return new NextResponse("Unauthorized", { status: 403 })
-    }
-
-    const user = await UserService.getUserById(params.id)
-
-    if (!user) {
-      return new NextResponse("User not found", { status: 404 })
-    }
-
-    const subscription = await prismadb.subscription.create({
-      data: {
-        userId: params.id,
-      },
-    })
-
-    return NextResponse.json(subscription)
+    const params = await context.params
+    const subscriptions = await UserService.getSubscriptions(params.id)
+    return NextResponse.json(subscriptions)
   } catch (error) {
-    console.log("[SUBSCRIPTION_POST]", error)
-    return new NextResponse("Internal Error", { status: 500 })
+    console.error("Error fetching subscriptions:", error)
+    return NextResponse.json({ error: "Failed to fetch subscriptions" }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  try {
+    const params = await context.params
+    const { channelId } = await request.json()
+
+    if (!channelId) {
+      return NextResponse.json({ error: "Channel ID is required" }, { status: 400 })
+    }
+
+    const subscription = await UserService.subscribe(params.id, channelId)
+    return NextResponse.json(subscription, { status: 201 })
+  } catch (error) {
+    console.error("Error subscribing:", error)
+    return NextResponse.json({ error: "Failed to subscribe" }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  try {
+    const params = await context.params
+    const { searchParams } = new URL(request.url)
+    const channelId = searchParams.get("channelId")
+
+    if (!channelId) {
+      return NextResponse.json({ error: "Channel ID is required" }, { status: 400 })
+    }
+
+    await UserService.unsubscribe(params.id, channelId)
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("Error unsubscribing:", error)
+    return NextResponse.json({ error: "Failed to unsubscribe" }, { status: 500 })
   }
 }
