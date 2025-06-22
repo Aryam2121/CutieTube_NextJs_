@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       const event_name = data.event
       if (event_name === "subscription_created") {
         const supabaseUrl = "https://aqknwwmazqssqiiygbjk.supabase.co"
-        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+        const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxa253d21henFzc3FpaXlnYmprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA0MDA5NDcsImV4cCI6MjA2NTk3Njk0N30.zy41k261fQh6iRUUiLGRdk6VjLseFg9osR08PsLP3qs"
         const supabase = createClient(supabaseUrl, supabaseKey)
         const customer_id = data.data.attributes.customer_id
         const subscription_id = data.data.id
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
       if (event_name === "subscription_updated") {
         const supabaseUrl = "https://aqknwwmazqssqiiygbjk.supabase.co"
-        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+        const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxa253d21henFzc3FpaXlnYmprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA0MDA5NDcsImV4cCI6MjA2NTk3Njk0N30.zy41k261fQh6iRUUiLGRdk6VjLseFg9osR08PsLP3qs"
         const supabase = createClient(supabaseUrl, supabaseKey)
         const subscription_status = data.data.attributes.status
         const subscription_id = data.data.id
