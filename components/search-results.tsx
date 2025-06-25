@@ -53,12 +53,12 @@ export function SearchResults() {
         .order("created_at", { ascending: false })
 
       if (!error && data) {
-        // Filter out or map only valid video objects with valid profiles
         const validVideos = (data as any[]).filter(
           (v) => v.profiles && typeof v.profiles === "object" && "username" in v.profiles
-        ) as Video[];
+        ) as Video[]
         setVideos(validVideos)
       }
+
       setLoading(false)
     }
 
