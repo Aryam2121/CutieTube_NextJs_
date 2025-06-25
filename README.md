@@ -1,7 +1,7 @@
 # 🎬 CutieTube - Modern Video Sharing Platform
 
 <div align="center">
-  <img src="https://drive.google.com/file/d/1pUpiT0a4iaXI4wxF28DHjUvon2ilEVcz/view?usp=sharing" alt="CutieTube Logo" width="200" height="200">
+  
   
   [![Next.js](https://img.shields.io/badge/Next.js-15.3.4-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
   [![React](https://img.shields.io/badge/React-19.0.0-blue?style=for-the-badge&logo=react)](https://reactjs.org/)
