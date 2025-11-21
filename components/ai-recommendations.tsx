@@ -323,15 +323,19 @@ export function AIRecommendations() {
 
                 {/* Video Card */}
                 <VideoCard
-                  id={video.id}
-                  title={video.title}
-                  channel={video.channel}
-                  channelAvatar={video.channelAvatar}
-                  views={video.views}
-                  uploadDate={video.uploadDate}
-                  duration={video.duration}
-                  thumbnail={video.thumbnail}
-                  verified={video.verified}
+                  video={{
+                    id: video.id.toString(),
+                    title: video.title,
+                    thumbnail: video.thumbnail,
+                    duration: video.duration,
+                    views: parseInt(video.views.replace(/[^0-9]/g, '')) || 0,
+                    uploadedAt: video.uploadDate,
+                    channel: {
+                      name: video.channel,
+                      avatar: video.channelAvatar || '/placeholder.svg',
+                      isVerified: video.verified,
+                    },
+                  }}
                   layout="grid"
                 />
 
