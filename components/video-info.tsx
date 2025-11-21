@@ -16,7 +16,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
 
-export function VideoInfo() {
+interface VideoInfoProps {
+  video: any
+}
+
+export function VideoInfo({ video }: VideoInfoProps) {
   const [liked, setLiked] = useState(false)
   const [disliked, setDisliked] = useState(false)
   const [subscribed, setSubscribed] = useState(false)
@@ -34,7 +38,7 @@ export function VideoInfo() {
 
   const handleSubscribe = () => {
     setSubscribed(!subscribed)
-    toast.success(subscribed ? "Unsubscribed" : "Subscribed to TechCoder")
+    toast.success(subscribed ? "Unsubscribed" : `Subscribed to ${video?.channel?.name || 'channel'}`)
   }
 
   const handleShare = () => {
@@ -46,18 +50,41 @@ export function VideoInfo() {
     toast.info("Download started (simulated)")
   }
 
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M'
+    } else if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K'
+    }
+    return num.toString()
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffTime = Math.abs(now.getTime() - date.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    
+    if (diffDays === 0) return 'Today'
+    if (diffDays === 1) return '1 day ago'
+    if (diffDays < 7) return `${diffDays} days ago`
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`
+    return `${Math.floor(diffDays / 365)} years ago`
+  }
+
   return (
     <TooltipProvider>
       <div className="space-y-4">
         {/* Title + Views */}
         <div>
           <h1 className="text-xl font-bold mb-2">
-            Building a Modern YouTube Clone with Next.js and React
+            {video?.title || 'Video Title'}
           </h1>
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span>1,234,567 views</span>
+            <span>{formatNumber(video?.views || 0)} views</span>
             <span>•</span>
-            <span>2 days ago</span>
+            <span>{formatDate(video?.uploadedAt || new Date().toISOString())}</span>
           </div>
         </div>
 
@@ -66,12 +93,14 @@ export function VideoInfo() {
           {/* Left: Avatar + Info */}
           <div className="flex items-center gap-4">
             <Avatar className="h-10 w-10">
-              <AvatarImage src="/placeholder.svg?height=40&width=40" />
-              <AvatarFallback>TC</AvatarFallback>
+              <AvatarImage src={video?.channel?.avatar || '/placeholder.svg?height=40&width=40'} />
+              <AvatarFallback>{video?.channel?.name?.substring(0, 2).toUpperCase() || 'CH'}</AvatarFallback>
             </Avatar>
             <div>
-              <h3 className="font-semibold">TechCoder</h3>
-              <p className="text-sm text-muted-foreground">2.5M subscribers</p>
+              <h3 className="font-semibold">{video?.channel?.name || 'Channel Name'}</h3>
+              <p className="text-sm text-muted-foreground">
+                {formatNumber(video?.channel?.subscribers || 0)} subscribers
+              </p>
             </div>
             <Button
               className="rounded-full"
@@ -94,7 +123,7 @@ export function VideoInfo() {
                     onClick={handleLike}
                   >
                     <ThumbsUp className="h-4 w-4" />
-                    12K
+                    {formatNumber(video?.likes || 0)}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Like</TooltipContent>
@@ -165,22 +194,28 @@ export function VideoInfo() {
         {/* Description */}
         <div className="bg-muted rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <Badge variant="secondary">Tutorial</Badge>
-            <Badge variant="secondary">Next.js</Badge>
-            <Badge variant="secondary">React</Badge>
+            {video?.tags?.map((tag: string) => (
+              <Badge key={tag} variant="secondary">{tag}</Badge>
+            )) || (
+              <>
+                <Badge variant="secondary">Video</Badge>
+              </>
+            )}
           </div>
           <p className="text-sm whitespace-pre-line">
             {showMore
-              ? `In this comprehensive tutorial, we'll build a modern YouTube clone from scratch using Next.js, React, and Tailwind CSS. We'll cover everything from setting up the project to implementing video playback, user authentication, and responsive design.\n\nThis is perfect for intermediate developers looking to level up their frontend skills.`
-              : `In this comprehensive tutorial, we'll build a modern YouTube clone from scratch using Next.js, React, and Tailwind CSS. We'll cover everything from setting up the project...`}
+              ? video?.description || 'No description available.'
+              : (video?.description?.substring(0, 150) || 'No description available.') + (video?.description?.length > 150 ? '...' : '')}
           </p>
-          <Button
-            variant="link"
-            className="p-0 h-auto mt-2 text-sm"
-            onClick={() => setShowMore(!showMore)}
-          >
-            {showMore ? "Show less" : "Show more"}
-          </Button>
+          {video?.description && video.description.length > 150 && (
+            <Button
+              variant="link"
+              className="p-0 h-auto mt-2 text-sm"
+              onClick={() => setShowMore(!showMore)}
+            >
+              {showMore ? "Show less" : "Show more"}
+            </Button>
+          )}
         </div>
       </div>
     </TooltipProvider>
