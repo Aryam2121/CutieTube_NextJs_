@@ -43,7 +43,11 @@ const initialComments = [
   },
 ]
 
-export function Comments() {
+interface CommentsProps {
+  videoId: string
+}
+
+export function Comments({ videoId }: CommentsProps) {
   const [comments, setComments] = useState(initialComments)
   const [likedMap, setLikedMap] = useState<Record<number, boolean>>({})
   const [dislikedMap, setDislikedMap] = useState<Record<number, boolean>>({})
