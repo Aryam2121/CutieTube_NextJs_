@@ -21,7 +21,11 @@ interface Video {
   preview?: string // video preview
 }
 
-export function VideoRecommendations() {
+interface VideoRecommendationsProps {
+  currentVideoId: string
+}
+
+export function VideoRecommendations({ currentVideoId }: VideoRecommendationsProps) {
   const [videos, setVideos] = useState<Video[]>([])
   const [autoplay, setAutoplay] = useState(true)
   const isLoggedIn = true // mock auth
