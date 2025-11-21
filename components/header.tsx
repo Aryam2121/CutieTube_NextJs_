@@ -29,6 +29,7 @@ import { useTheme } from "next-themes"
 import { useAuth } from "@/components/auth-provider"
 import { AuthDialog } from "@/components/auth-dialog"
 import { UploadDialog } from "@/components/upload-dialog"
+import { NotificationCenter } from "@/components/notification-center"
 import { cn } from "@/lib/utils"
 
 export function Header() {
@@ -119,9 +120,7 @@ export function Header() {
                 >
                   <Upload className="h-5 w-5" />
                 </Button>
-                <Button variant="ghost" size="icon" aria-label="Notifications">
-                  <Bell className="h-5 w-5" />
-                </Button>
+                <NotificationCenter />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-8 w-8 rounded-full" aria-label="User Menu">

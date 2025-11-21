@@ -35,6 +35,7 @@ const sidebarSections = [
       { icon: Home, label: "Home", href: "/" },
       { icon: Compass, label: "Explore", href: "/explore" },
       { icon: PlaySquare, label: "Subscriptions", href: "/subscriptions" },
+      { icon: Film, label: "Shorts", href: "/shorts" },
     ],
   },
   {
